@@ -1,0 +1,13 @@
+[Indicator Service]
+Name=indicator-sound
+ObjectPath=/com/canonical/indicator/sound
+Position=30
+
+[desktop]
+ObjectPath=/com/canonical/indicator/sound/desktop
+
+[phone]
+ObjectPath=/com/canonical/indicator/sound/phone
+
+[desktop_greeter]
+ObjectPath=/com/canonical/indicator/sound/desktop_greeter
