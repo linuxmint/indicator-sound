@@ -118,14 +118,18 @@ public class IndicatorSound.Service {
 	}
 
 	void activate_desktop_settings (SimpleAction action, Variant? param) {
-		var env = Environment.get_variable ("DESKTOP_SESSION");
 		string cmd;
-		if (env == "unity")
-			cmd = "gnome-control-center sound-nua";
-		else if (env == "xubuntu" || env == "ubuntustudio")
+		if (FileUtils.test("/usr/bin/pavucontrol",GLib.FileTest.EXISTS) == true) {
 			cmd = "pavucontrol";
-		else
-			cmd = "gnome-control-center sound";
+		} else {
+    		var env = Environment.get_variable ("DESKTOP_SESSION");			
+			if (env == "unity")
+				cmd = "gnome-control-center sound-nua";
+			else if (env == "xubuntu" || env == "ubuntustudio")
+				cmd = "xfce4-mixer";
+			else
+				cmd = "gnome-control-center sound";	
+		}		
 
 		try {
 			Process.spawn_command_line_async (cmd);
