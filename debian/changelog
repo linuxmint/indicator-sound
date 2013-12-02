@@ -1,3 +1,10 @@
+indicator-sound (12.10.2+13.10.20131011-1linuxmint1) petra; urgency=low
+
+  * Use pavucontrol when installed
+  * Use the gtk2 indicator in LXDE/Xfce
+
+ -- Clement Lefebvre <root@linuxmint.com>  Mon, 02 Dec 2013 13:46:09 +0000
+
 indicator-sound (12.10.2+13.10.20131011-0ubuntu1) saucy; urgency=low
 
   [ Lars Uebernickel ]
