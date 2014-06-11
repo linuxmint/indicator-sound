@@ -1,3 +1,9 @@
+indicator-sound (12.10.2+14.04.20140401-1linuxmint1) qiana; urgency=medium
+
+  * Use pavucontrol if it's installed 
+
+ -- Clement Lefebvre <root@linuxmint.com>  Wed, 11 Jun 2014 12:03:36 +0100
+
 indicator-sound (12.10.2+14.04.20140401-0ubuntu1) trusty; urgency=low
 
   [ Michael Terry ]
