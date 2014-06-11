@@ -8,28 +8,32 @@
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
+ * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *      Lars Uebernickel <lars.uebernickel@canonical.com>
  */
 
-/* Icon.serialize() is not yet in gio-2.0.vapi; remove this when it is */
-extern Variant? g_icon_serialize (Icon icon);
-
-class SoundMenu: Object
+public class SoundMenu: Object
 {
-	public SoundMenu (bool show_mute, string? settings_action) {
+	public enum DisplayFlags {
+		NONE = 0,
+		SHOW_MUTE = 1,
+		HIDE_INACTIVE_PLAYERS = 2,
+		HIDE_PLAYERS = 4
+	}
+
+	public SoundMenu (string? settings_action, DisplayFlags flags) {
 		/* A sound menu always has at least two sections: the volume section (this.volume_section)
 		 * at the start of the menu, and the settings section at the end. Between those two,
 		 * it has a dynamic amount of player sections, one for each registered player.
 		 */
 
 		this.volume_section = new Menu ();
-		if (show_mute)
+		if ((flags & DisplayFlags.SHOW_MUTE) != 0)
 			volume_section.append (_("Mute"), "indicator.mute");
 		volume_section.append_item (this.create_slider_menu_item ("indicator.volume(0)", 0.0, 1.0, 0.01,
 																  "audio-volume-low-zero-panel",
@@ -51,6 +55,10 @@ class SoundMenu: Object
 
 		this.root = new Menu ();
 		root.append_item (root_item);
+
+		this.hide_players = (flags & DisplayFlags.HIDE_PLAYERS) != 0;
+		this.hide_inactive = (flags & DisplayFlags.HIDE_INACTIVE_PLAYERS) != 0;
+		this.notify_handlers = new HashTable<MediaPlayer, ulong> (direct_hash, direct_equal);
 	}
 
 	public void export (DBusConnection connection, string object_path) {
@@ -81,25 +89,97 @@ class SoundMenu: Object
 	}
 
 	public void add_player (MediaPlayer player) {
-		/* Add new players to the end of the player sections, just before the settings */
+		if (this.notify_handlers.contains (player))
+			return;
+
+		if (player.is_running || !this.hide_inactive)
+			this.insert_player_section (player);
+		this.update_playlists (player);
+
+		var handler_id = player.notify["is-running"].connect ( () => {
+			if (player.is_running)
+				if (this.find_player_section(player) == -1)
+					this.insert_player_section (player);
+			else
+				if (this.hide_inactive)
+					this.remove_player_section (player);
+
+			this.update_playlists (player);
+		});
+		this.notify_handlers.insert (player, handler_id);
+
+		player.playlists_changed.connect (this.update_playlists);
+	}
+
+	public void remove_player (MediaPlayer player) {
+		this.remove_player_section (player);
+
+		var id = this.notify_handlers.lookup(player);
+		if (id != 0) {
+			player.disconnect(id);
+		}
+
+		player.playlists_changed.disconnect (this.update_playlists);
+
+		/* this'll drop our ref to it */
+		this.notify_handlers.remove (player);
+	}
+
+	public Menu root;
+	public Menu menu;
+	Menu volume_section;
+	bool mic_volume_shown;
+	bool settings_shown = false;
+	bool hide_inactive;
+	bool hide_players = false;
+	HashTable<MediaPlayer, ulong> notify_handlers;
+
+	/* returns the position in this.menu of the section that's associated with @player */
+	int find_player_section (MediaPlayer player) {
+		debug("Looking for player: %s", player.id);
+		string action_name = @"indicator.$(player.id)";
+		int n = this.menu.get_n_items ();
+		for (int i = 0; i < n; i++) {
+			var section = this.menu.get_item_link (i, Menu.LINK_SECTION);
+			if (section == null) continue;
+
+			string action;
+			section.get_item_attribute (0, "action", "s", out action);
+			if (action == action_name)
+				return i;
+		}
+
+		debug("Unable to find section for player: %s", player.id);
+		return -1;
+	}
+
+	void insert_player_section (MediaPlayer player) {
+		if (this.hide_players)
+			return;
+
+		var section = new Menu ();
+		Icon icon;
+
+		debug("Adding section for player: %s (%s)", player.id, player.is_running ? "running" : "not running");
+
+		icon = player.icon;
+		if (icon == null)
+			icon = new ThemedIcon.with_default_fallbacks ("application-default-icon");
+
 		var player_item = new MenuItem (player.name, "indicator." + player.id);
 		player_item.set_attribute ("x-canonical-type", "s", "com.canonical.unity.media-player");
-		player_item.set_attribute_value ("icon", g_icon_serialize (player.icon));
+		if (icon != null)
+			player_item.set_attribute_value ("icon", icon.serialize ());
+		section.append_item (player_item);
 
 		var playback_item = new MenuItem (null, null);
 		playback_item.set_attribute ("x-canonical-type", "s", "com.canonical.unity.playback-item");
 		playback_item.set_attribute ("x-canonical-play-action", "s", "indicator.play." + player.id);
 		playback_item.set_attribute ("x-canonical-next-action", "s", "indicator.next." + player.id);
 		playback_item.set_attribute ("x-canonical-previous-action", "s", "indicator.previous." + player.id);
-
-		var section = new Menu ();
-		section.append_item (player_item);
 		section.append_item (playback_item);
 
-		player.playlists_changed.connect (this.update_playlists);
-		player.notify["is-running"].connect ( () => this.update_playlists (player) );
-		update_playlists (player);
-
+		/* Add new players to the end of the player sections, just before the settings */
 		if (settings_shown) {
 			this.menu.insert_section (this.menu.get_n_items () -1, null, section);
 		} else {
@@ -107,31 +187,13 @@ class SoundMenu: Object
 		}
 	}
 
-	public void remove_player (MediaPlayer player) {
+	void remove_player_section (MediaPlayer player) {
+		if (this.hide_players)
+			return;
+
 		int index = this.find_player_section (player);
 		if (index >= 0)
 			this.menu.remove (index);
-	}
-
-	Menu root;
-	Menu menu;
-	Menu volume_section;
-	bool mic_volume_shown;
-	bool settings_shown = false;
-
-	/* returns the position in this.menu of the section that's associated with @player */
-	int find_player_section (MediaPlayer player) {
-		string action_name = @"indicator.$(player.id)";
-		int n = this.menu.get_n_items () -1;
-		for (int i = 1; i < n; i++) {
-			var section = this.menu.get_item_link (i, Menu.LINK_SECTION);
-			string action;
-			section.get_item_attribute (0, "action", "s", out action);
-			if (action == action_name)
-				return i;
-		}
-
-		return -1;
 	}
 
 	void update_playlists (MediaPlayer player) {
@@ -171,8 +233,8 @@ class SoundMenu: Object
 
 		var slider = new MenuItem (null, action);
 		slider.set_attribute ("x-canonical-type", "s", "com.canonical.unity.slider");
-		slider.set_attribute_value ("min-icon", g_icon_serialize (min_icon));
-		slider.set_attribute_value ("max-icon", g_icon_serialize (max_icon));
+		slider.set_attribute_value ("min-icon", min_icon.serialize ());
+		slider.set_attribute_value ("max-icon", max_icon.serialize ());
 		slider.set_attribute ("min-value", "d", min);
 		slider.set_attribute ("max-value", "d", max);
 		slider.set_attribute ("step", "d", step);

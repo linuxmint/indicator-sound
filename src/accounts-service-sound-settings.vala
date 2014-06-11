@@ -1,5 +1,5 @@
 /*
- * Copyright © 2014 Canonical Ltd.
+ * Copyright 2014 © Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,17 +17,17 @@
  *      Ted Gould <ted@canonical.com>
  */
 
-public class MediaPlayerList {
-	public class Iterator {
-		public virtual MediaPlayer? next_value() {
-			return null;
-		}
-	}
-	public virtual Iterator iterator () { return new Iterator(); }
-
-	public virtual void sync (string[] ids) { return; }
-
-	public signal void player_added (MediaPlayer player);
-	public signal void player_removed (MediaPlayer player);
+[DBus (name = "com.canonical.indicator.sound.AccountsService")]
+public interface AccountsServiceSoundSettings : Object {
+	// properties
+	public abstract uint64 timestamp {owned get; set;}
+	public abstract string player_name {owned get; set;}
+	public abstract Variant player_icon {owned get; set;}
+	public abstract bool running {owned get; set;}
+	public abstract string state {owned get; set;}
+	public abstract string title {owned get; set;}
+	public abstract string artist {owned get; set;}
+	public abstract string album {owned get; set;}
+	public abstract string art_url {owned get; set;}
 }
 

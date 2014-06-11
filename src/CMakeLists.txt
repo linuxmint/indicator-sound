@@ -5,8 +5,20 @@
 
 set(HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/indicator-sound-service.h")
 set(SYMBOLS_PATH "${CMAKE_CURRENT_BINARY_DIR}/indicator-sound-service.def")
+set(VAPI_PATH "${CMAKE_CURRENT_BINARY_DIR}/indicator-sound-service.vapi")
+
+vapi_gen(accounts-service
+	LIBRARY
+		accounts-service
+	PACKAGES
+		gio-2.0
+	INPUT
+		/usr/share/gir-1.0/AccountsService-1.0.gir
+)
 
 vala_init(indicator-sound-service
+  DEPENDS
+    accounts-service
   PACKAGES
     config
     gio-2.0
@@ -15,12 +27,12 @@ vala_init(indicator-sound-service
     libpulse
     libpulse-mainloop-glib
     libnotify
+    accounts-service
   OPTIONS
     --ccode
     --thread
     --vapidir=${CMAKE_SOURCE_DIR}/vapi/
     --vapidir=.
-    --target-glib=2.36
     --pkg=url-dispatcher
     --pkg=bus-watcher
 )
@@ -32,25 +44,47 @@ vala_add(indicator-sound-service
     volume-control
     media-player
     media-player-list
-)
-vala_add(indicator-sound-service
-  main.vala
-  DEPENDS
-    service
+    mpris2-interfaces
+    accounts-service-user
 )
 vala_add(indicator-sound-service
   volume-control.vala
 )
 vala_add(indicator-sound-service
   media-player.vala
+)
+vala_add(indicator-sound-service
+  media-player-mpris.vala
   DEPENDS
+    media-player
     mpris2-interfaces
+)
+vala_add(indicator-sound-service
+  media-player-user.vala
+  DEPENDS
+    media-player
+	accounts-service-sound-settings
+    greeter-broadcast
 )
 vala_add(indicator-sound-service
   media-player-list.vala
   DEPENDS
     media-player
+)
+vala_add(indicator-sound-service
+  media-player-list-mpris.vala
+  DEPENDS
+    media-player-list
+    media-player
+    media-player-mpris
     mpris2-interfaces
+)
+vala_add(indicator-sound-service
+  media-player-list-greeter.vala
+  DEPENDS
+    media-player-list
+    media-player-user
+    media-player
 )
 vala_add(indicator-sound-service
   mpris2-interfaces.vala
@@ -63,6 +97,20 @@ vala_add(indicator-sound-service
   DEPENDS
     media-player
 )
+vala_add(indicator-sound-service
+  accounts-service-user.vala
+  DEPENDS
+    media-player
+    mpris2-interfaces
+    accounts-service-sound-settings
+    greeter-broadcast
+)
+vala_add(indicator-sound-service
+  accounts-service-sound-settings.vala
+)
+vala_add(indicator-sound-service
+  greeter-broadcast.vala
+)
 
 vala_finish(indicator-sound-service
   SOURCES
@@ -73,6 +121,8 @@ vala_finish(indicator-sound-service
     ${HEADER_PATH}
   GENERATE_SYMBOLS
     ${SYMBOLS_PATH}
+  GENERATE_VAPI
+    ${VAPI_PATH}
 )
 
 set_source_files_properties(
@@ -90,16 +140,33 @@ set(
 )
 
 ###########################
-# Executable
+# Lib
 ###########################
 
 add_definitions(
   -w
 )
 
+add_library(
+	indicator-sound-service-lib STATIC
+	${INDICATOR_SOUND_SOURCES}
+)
+
+target_link_libraries(
+  indicator-sound-service-lib
+  ${PULSEAUDIO_LIBRARIES}
+  ${SOUNDSERVICE_LIBRARIES}
+)
+
+###########################
+# Executable
+###########################
+
+include_directories(${CMAKE_BINARY_DIR})
+
 add_executable(
   indicator-sound-service-bin
-  ${INDICATOR_SOUND_SOURCES}
+  main.c
 )
 
 set_target_properties(
@@ -110,8 +177,7 @@ set_target_properties(
 
 target_link_libraries(
   indicator-sound-service-bin
-  ${PULSEAUDIO_LIBRARIES}
-  ${SOUNDSERVICE_LIBRARIES}
+  indicator-sound-service-lib
 )
 
 ###########################
