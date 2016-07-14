@@ -79,6 +79,24 @@ public class MediaPlayerMpris: MediaPlayer {
 		}
 	}
 
+	public override bool can_do_play {
+		get {
+			return this.proxy.CanPlay;
+		}
+	}
+	
+	public override bool can_do_prev {
+		get {
+			return this.proxy.CanGoPrevious;
+		}
+	}
+
+	public override bool can_do_next {
+		get {
+			return this.proxy.CanGoNext;
+		}
+	}
+
 	/**
 	 * Attach this object to a process of the associated media player.  The player must own @dbus_name and
 	 * implement the org.mpris.MediaPlayer2.Player interface.
@@ -202,13 +220,13 @@ public class MediaPlayerMpris: MediaPlayer {
 			gproxy.g_properties_changed.connect (this.proxy_properties_changed);
 
 			this.notify_property ("is-running");
-			this.state = this.proxy.PlaybackStatus;
+			this.state = this.proxy.PlaybackStatus != null ? this.proxy.PlaybackStatus : "Unknown";
 			this.update_current_track (gproxy.get_cached_property ("Metadata"));
 
 			if (this.play_when_attached) {
 				/* wait a little before calling PlayPause, some players need some time to
 				   set themselves up */
-				Timeout.add (1000, () => { proxy.PlayPause.begin (); return false; } );
+				Timeout.add (1000, () => { proxy.PlayPause.begin (); return Source.REMOVE; } );
 				this.play_when_attached = false;
 			}
 		}
@@ -251,7 +269,7 @@ public class MediaPlayerMpris: MediaPlayer {
 			return;
 		}
 
-		Timeout.add (500, () => { this.fetch_playlists (); return false; } );
+		Timeout.add (500, () => { this.fetch_playlists (); return Source.REMOVE; } );
 	}
 
 	/* some players (e.g. Spotify) don't follow the spec closely and pass single strings in metadata fields
@@ -270,10 +288,14 @@ public class MediaPlayerMpris: MediaPlayer {
 
 	void proxy_properties_changed (DBusProxy proxy, Variant changed_properties, string[] invalidated_properties) {
 		if (changed_properties.lookup ("PlaybackStatus", "s", null)) {
-			this.state = this.proxy.PlaybackStatus;
+			this.state = this.proxy.PlaybackStatus != null ? this.proxy.PlaybackStatus : "Unknown";
+		}
+		if (changed_properties.lookup ("CanGoNext", "b", null) || changed_properties.lookup ("CanGoPrevious", "b", null) ||
+                    changed_properties.lookup ("CanPlay", "b", null) || changed_properties.lookup ("CanPause", "b", null)) {
+			this.playbackstatus_changed ();
 		}
 
-		var metadata = changed_properties.lookup_value ("Metadata", new VariantType ("a{sv}"));
+		var metadata = changed_properties.lookup_value ("Metadata", VariantType.VARDICT);
 		if (metadata != null)
 			this.update_current_track (metadata);
 	}
@@ -283,7 +305,7 @@ public class MediaPlayerMpris: MediaPlayer {
 			this.fetch_playlists ();
 	}
 
-	void update_current_track (Variant metadata) {
+	void update_current_track (Variant? metadata) {
 		if (metadata != null) {
 			this.current_track = new Track (
 				sanitize_metadata_value (metadata.lookup_value ("xesam:artist", null)),

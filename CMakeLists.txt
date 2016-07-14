@@ -24,12 +24,14 @@ set(SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set(SOURCE_BINARY_DIR "${CMAKE_BINARY_DIR}/src")
 
 set(PULSE_AUDIO_REQUIRED_VERSION 0.9.19)
+set(GLIB_2_0_REQUIRED_VERSION 2.32)
 set(GIO_2_0_REQUIRED_VERSION 2.25.13)
 set(URL_DISPATCHER_1_REQUIRED_VERSION 1)
 
 pkg_check_modules(
   PULSEAUDIO REQUIRED
   libpulse-mainloop-glib>=${PULSE_AUDIO_REQUIRED_VERSION}
+  glib-2.0>=${GLIB_2_0_REQUIRED_VERSION}
   gio-unix-2.0>=${GIO_2_0_REQUIRED_VERSION}
   url-dispatcher-1>=${URL_DISPATCHER_1_REQUIRED_VERSION}
 )
@@ -37,7 +39,7 @@ include_directories(${PULSEAUDIO_INCLUDE_DIRS})
 
 pkg_check_modules(
   SOUNDSERVICE REQUIRED
-  gee-1.0
+  gee-0.8
   gio-2.0>=${GIO_2_0_REQUIRED_VERSION}
   gio-unix-2.0
   gthread-2.0
@@ -49,7 +51,7 @@ include_directories(${SOUNDSERVICE_INCLUDE_DIRS})
 
 pkg_check_modules(
   TEST REQUIRED
-  dbustest-1
+  dbustest-1>=15.04.0
 )
 include_directories(${TEST_INCLUDE_DIRS})
 
