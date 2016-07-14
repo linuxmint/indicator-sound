@@ -253,7 +253,7 @@ public class IndicatorSound.Service: Object {
 			return;
 		}
 
-		if (env == "xubuntu" || env == "ubuntustudio")
+		if (FileUtils.test("/usr/bin/pavucontrol",GLib.FileTest.EXISTS) == true)
 			cmd = "pavucontrol";
 		else if (env == "mate")
 			cmd = "mate-volume-control";
