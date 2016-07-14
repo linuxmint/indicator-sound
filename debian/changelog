@@ -1,3 +1,9 @@
+indicator-sound (12.10.2+16.04.20160714-1linuxmint1) sarah; urgency=medium
+
+  * Use pavucontrol if it's installed.
+
+ -- Clement Lefebvre <root@linuxmint.com>  Thu, 14 Jul 2016 12:18:11 +0200
+
 indicator-sound (12.10.2+16.04.20160406-0ubuntu1) xenial; urgency=medium
 
   * Support multiple desktop names in $XDG_CURRENT_DESKTOP. (LP:
